@@ -6,7 +6,7 @@ on:
 jobs:
   docker:
     env:
-      TAG: v3.2.1
+      TAG: v3.4.1
     runs-on: ubuntu-latest
     steps:
       -
