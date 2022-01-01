@@ -6,7 +6,7 @@ on:
 jobs:
   docker:
     env:
-      TAG: v3.4.1
+      TAG: v3.4.4-patched
     runs-on: ubuntu-latest
     steps:
       -
@@ -25,11 +25,11 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Clone Mastodon
         run: |
-          git clone https://github.com/mastodon/mastodon.git -b $TAG --depth 1
+          git clone https://github.com/kgtkr/mastodon.git -b $TAG --depth 1
       -
         name: Build and push
         uses: docker/build-push-action@v2
