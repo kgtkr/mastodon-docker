@@ -1,12 +1,7 @@
 name: ci
-on:
-  push:
-    branches:
-      - master
+on: push
 jobs:
   docker:
-    env:
-      TAG: v3.4.4-patched
     runs-on: ubuntu-latest
     steps:
       -
@@ -27,16 +22,18 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
-        name: Clone Mastodon
-        run: |
-          git clone https://github.com/kgtkr/mastodon.git -b $TAG --depth 1
+        name: Generate tags
+        uses: kgtkr/docker-tags-gen-action@master
+        id: tags
+        with:
+          name: ghcr.io/${{ github.repository_owner }}/mastodon-docker
       -
         name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: mastodon
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/mastodon-docker:${{ env.TAG }}-${{ github.sha }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,0 +1,73 @@
+diff --git a/app/chewy/statuses_index.rb b/app/chewy/statuses_index.rb
+index 6dd4fb18b..16429b3fd 100644
+--- a/app/chewy/statuses_index.rb
++++ b/app/chewy/statuses_index.rb
+@@ -4,6 +4,13 @@ class StatusesIndex < Chewy::Index
+   include FormattingHelper
+ 
+   settings index: { refresh_interval: '30s' }, analysis: {
++    tokenizer: {
++      sudachi_tokenizer: {
++        type: 'sudachi_tokenizer',
++        discard_punctuation: true,
++        ignore_unavailable: true,
++      },
++    },
+     filter: {
+       english_stop: {
+         type: 'stop',
+@@ -20,7 +27,8 @@ class StatusesIndex < Chewy::Index
+     },
+     analyzer: {
+       content: {
+-        tokenizer: 'uax_url_email',
++        tokenizer: 'sudachi_tokenizer',
++        type: 'custom',
+         filter: %w(
+           english_possessive_stemmer
+           lowercase
+@@ -28,6 +36,9 @@ class StatusesIndex < Chewy::Index
+           cjk_width
+           english_stop
+           english_stemmer
++          sudachi_part_of_speech
++          sudachi_ja_stop
++          sudachi_baseform
+         ),
+       },
+     },
+@@ -71,5 +82,6 @@ class StatusesIndex < Chewy::Index
+     end
+ 
+     field :searchable_by, type: 'long', value: ->(status, crutches) { status.searchable_by(crutches) }
++    field :searchable_by_anyone, type: 'boolean', value: ->(status) { status.public_visibility? }
+   end
+ end
+diff --git a/app/services/activitypub/process_account_service.rb b/app/services/activitypub/process_account_service.rb
+index 2da9096c7..d773f409e 100644
+--- a/app/services/activitypub/process_account_service.rb
++++ b/app/services/activitypub/process_account_service.rb
+@@ -126,7 +126,8 @@ class ActivityPub::ProcessAccountService < BaseService
+       RedownloadAvatarWorker.perform_in(rand(30..600).seconds, @account.id)
+     end
+     begin
+-      @account.header_remote_url = image_url('image') || '' unless skip_download?
++      # 容量節約のためヘッダのダウンロードはスキップする
++      @account.header_remote_url = image_url('image') || '' unless true
+       @account.header = nil if @account.header_remote_url.blank?
+     rescue Mastodon::UnexpectedResponseError, HTTP::TimeoutError, HTTP::ConnectionError, OpenSSL::SSL::SSLError
+       RedownloadHeaderWorker.perform_in(rand(30..600).seconds, @account.id)
+diff --git a/app/services/search_service.rb b/app/services/search_service.rb
+index 1a76cbb38..8069964ee 100644
+--- a/app/services/search_service.rb
++++ b/app/services/search_service.rb
+@@ -35,7 +35,8 @@ class SearchService < BaseService
+   end
+ 
+   def perform_statuses_search!
+-    definition = parsed_query.apply(StatusesIndex.filter(term: { searchable_by: @account.id }))
++    # 公開トゥートは検索に含める
++    definition = parsed_query.apply(StatusesIndex.filter(term: { searchable_by: @account.id }).filter.or(term: { searchable_by_anyone: true }))
+ 
+     if @options[:account_id].present?
+       definition = definition.filter(term: { account_id: @options[:account_id] })
